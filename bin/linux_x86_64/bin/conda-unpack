@@ -1,0 +1,389 @@
+#!/usr/bin/env python
+# Much of this file borrowed from conda/core/portability.py:
+#
+# https://github.com/conda/conda/blob/master/conda/core/portability.py
+#
+# The license of which has been provided below:
+#
+# -----------------------------------------------------------------------------
+#
+# BSD 3-Clause License
+#
+# Copyright (c) 2012, Continuum Analytics, Inc.
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+#     * Redistributions of source code must retain the above copyright
+#       notice, this list of conditions and the following disclaimer.
+#     * Redistributions in binary form must reproduce the above copyright
+#       notice, this list of conditions and the following disclaimer in the
+#       documentation and/or other materials provided with the distribution.
+#     * Neither the name of the copyright holder nor the names of its
+#       contributors may be used to endorse or promote products
+#       derived from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+import re
+import struct
+import sys
+
+on_win = sys.platform == 'win32'
+
+# three capture groups: whole_shebang, executable, options
+SHEBANG_REGEX = (
+        # pretty much the whole match string
+        br'^(#!'
+        # allow spaces between #! and beginning of the executable path
+        br'(?:[ ]*)'
+        # the executable is the next text block without an escaped
+        # space or non-space whitespace character
+        br'(/(?:\\ |[^ \n\r\t])*)'
+        # the rest of the line can contain option flags
+        br'(.*)'
+        # end whole_shebang group
+        br')$')
+
+
+def update_prefix(path, new_prefix, placeholder, mode='text'):
+    if on_win and mode == 'text':
+        # force all prefix replacements to forward slashes to simplify need to
+        # escape backslashes replace with unix-style path separators
+        new_prefix = new_prefix.replace('\\', '/')
+
+    with open(path, 'rb+') as fh:
+        original_data = fh.read()
+        fh.seek(0)
+
+        data = replace_prefix(original_data, mode, placeholder, new_prefix)
+
+        # If the before and after content is the same, skip writing
+        if data != original_data:
+            fh.write(data)
+            fh.truncate()
+
+
+def replace_prefix(data, mode, placeholder, new_prefix):
+    if mode == 'text':
+        data2 = text_replace(data, placeholder, new_prefix)
+    elif mode == 'binary':
+        data2 = binary_replace(data,
+                               placeholder.encode('utf-8'),
+                               new_prefix.encode('utf-8'))
+        if len(data2) != len(data):
+            message = ("Found mismatched data length in binary file:\n"
+                       "original data length: {len_orig!d})\n"
+                       "new data length: {len_new!d}\n"
+                       ).format(len_orig=len(data),
+                                len_new=len(data2))
+            raise ValueError(message)
+    else:
+        raise ValueError("Invalid mode: %r" % mode)
+    return data2
+
+
+def text_replace(data, placeholder, new_prefix):
+    return data.replace(placeholder.encode('utf-8'), new_prefix.encode('utf-8'))
+
+
+if on_win:
+    def binary_replace(data, placeholder, new_prefix):
+        if placeholder not in data:
+            return data
+        return replace_pyzzer_entry_point_shebang(data, placeholder, new_prefix)
+
+else:
+    def binary_replace(data, placeholder, new_prefix):
+        """Perform a binary replacement of `data`, where ``placeholder`` is
+        replaced with ``new_prefix`` and the remaining string is padded with null
+        characters.  All input arguments are expected to be bytes objects."""
+
+        def replace(match):
+            occurances = match.group().count(placeholder)
+            padding = (len(placeholder) - len(new_prefix)) * occurances
+            if padding < 0:
+                raise ValueError("negative padding")
+            return match.group().replace(placeholder, new_prefix) + b'\0' * padding
+
+        pat = re.compile(re.escape(placeholder) + b'([^\0]*?)\0')
+        return pat.sub(replace, data)
+
+
+def replace_pyzzer_entry_point_shebang(all_data, placeholder, new_prefix):
+    """Code adapted from pyzzer. This is meant to deal with entry point exe's
+    created by distlib, which consist of a launcher, then a shebang, then a zip
+    archive of the entry point code to run.  We need to change the shebang.
+    """
+    # Copyright (c) 2013 Vinay Sajip.
+    #
+    # Permission is hereby granted, free of charge, to any person obtaining a copy
+    # of this software and associated documentation files (the "Software"), to deal
+    # in the Software without restriction, including without limitation the rights
+    # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    # copies of the Software, and to permit persons to whom the Software is
+    # furnished to do so, subject to the following conditions:
+    #
+    # The above copyright notice and this permission notice shall be included in
+    # all copies or substantial portions of the Software.
+    #
+    # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+    # THE SOFTWARE.
+    launcher = shebang = None
+    pos = all_data.rfind(b'PK\x05\x06')
+    if pos >= 0:
+        end_cdr = all_data[pos + 12:pos + 20]
+        cdr_size, cdr_offset = struct.unpack('<LL', end_cdr)
+        arc_pos = pos - cdr_size - cdr_offset
+        data = all_data[arc_pos:]
+        if arc_pos > 0:
+            pos = all_data.rfind(b'#!', 0, arc_pos)
+            if pos >= 0:
+                shebang = all_data[pos:arc_pos]
+                if pos > 0:
+                    launcher = all_data[:pos]
+
+        if data and shebang and launcher:
+            if hasattr(placeholder, 'encode'):
+                placeholder = placeholder.encode('utf-8')
+            if hasattr(new_prefix, 'encode'):
+                new_prefix = new_prefix.encode('utf-8')
+            shebang = shebang.replace(placeholder, new_prefix)
+            all_data = b"".join([launcher, shebang, data])
+    return all_data
+
+
+_prefix_records = [
+('lib/python3.7/site-packages/numpy/__config__.py', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/python3.7/site-packages/numpy/distutils/__config__.py', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/python3.7/site-packages/numpy/distutils/site.cfg', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/python-3.7.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/python3.7/_sysconfigdata_i686_conda_cos6_linux_gnu.py', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/python3.7/_sysconfigdata_m_linux_x86_64-linux-gnu.py', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/python3.7/_sysconfigdata_m_linux_x86_64-linux-gnu.py.orig', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/python3.7/_sysconfigdata_powerpc64le_conda_cos7_linux_gnu.py', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/python3.7/_sysconfigdata_x86_64_apple_darwin13_4_0.py', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/python3.7/_sysconfigdata_x86_64_conda_cos6_linux_gnu.py', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/python3.7/config-3.7m-x86_64-linux-gnu/Makefile', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/python3.7/config-3.7m-x86_64-linux-gnu/python-config.py', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/python3.7/site-packages/scipy/__config__.py', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/libedit.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/zlib.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('bin/ncursesw6-config', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/libtinfow.a', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('lib/libtinfow.so.6.1', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('lib/pkgconfig/form.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/formw.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/menu.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/menuw.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/ncurses++.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/ncurses++w.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/ncurses.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/ncursesw.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/panel.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/panelw.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/tinfo.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/tinfow.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('share/terminfo/a/abm85', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/a/abm85e', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/a/abm85h', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/a/abm85h-old', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/a/adm36', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/a/altos2', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/a/altos3', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/a/ampex210', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/c/cit101e', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/c/cit101e-132', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/c/cit101e-n', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/c/cit101e-n132', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/c/crt', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/d/ddr', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/d/dec-vt220', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/e/emu-220', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/g/go140', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/g/go140w', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/g/go225', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/h/hazel', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/h/hp2392', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/h/hp2641a', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/h/hp300h', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/h/hp700-wy', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/h/hp9845', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/h/hp98550', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/h/hpex', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/h/hpsub', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/i/ims-ansi', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/k/kt7', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/m/mai', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/m/mt4520-rv', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/ncsa', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/ncsa-m', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/ncsa-m-ns', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/ncsa-ns', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/ncsa-vt220', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/netbsd6', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news-29', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news-29-euc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news-29-sjis', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news-33', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news-33-euc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news-33-sjis', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news-42', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news-42-euc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news-42-sjis', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news-old-unk', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news-unk', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news28', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/news29', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/nwp512', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/nwp512-a', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/nwp512-o', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/nwp513', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/nwp513-a', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/nwp513-o', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/nwp517', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/n/nwp517-w', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/o/opus3n1+', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/o/otek4115', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcmw', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt25', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt25-color', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt25w', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt28', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt28w', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt35', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt35w', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt40', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt40w', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt43', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt43w', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt50', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvt50w', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/p/pcvtXX', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/ti916', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/ti916-132', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/ti916-8', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/ti916-8-132', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi9065', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi910', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi910+', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912b', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912b-2p', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912b-2p-mc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912b-2p-p', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912b-2p-unk', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912b-mc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912b-p', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912b-unk', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912b-vb', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912b-vb-mc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912b-vb-p', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912b-vb-unk', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi912cc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi920b', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi920b-2p', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi920b-2p-mc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi920b-2p-p', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi920b-2p-unk', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi920b-mc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi920b-p', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi920b-unk', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi920b-vb', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi920b-vb-mc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi920b-vb-p', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi920b-vb-unk', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi921', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi924', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi92B', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvi92D', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/t/tvipt', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/u/uniterm', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/u/uts30', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/versaterm', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt200-js', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt220', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt220-8bit', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt220-nam', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt220-old', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt220-w', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt220d', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt320', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt320-k311', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt320-nam', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt320-w', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt320-w-nam', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt320nam', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt340', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt400', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt420', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt420f', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt420pc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt420pcdos', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt510', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt510pc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt510pcdos', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt520', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt520ansi', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/v/vt525', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/w/wsvt25', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/w/wsvt25m', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/x/x68k', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/z/z29a', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/z/z29a-kc-uc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/z/z29a-nkc-bc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/z/z29a-nkc-uc', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/z/z340', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('share/terminfo/z/z340-nam', '/tmp/build/80754af9/ncurses_1543442025755/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('bin/c_rehash', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/libcrypto.a', '/tmp/build/80754af9/openssl_1569593526749/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('lib/libcrypto.so.1.1', '/tmp/build/80754af9/openssl_1569593526749/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh', 'binary'),
+('lib/pkgconfig/libcrypto.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/libssl.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/openssl.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('ssl/misc/CA.pl', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('ssl/misc/tsget.pl', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/libffi.la', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/libffi.pc', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('bin/lzmainfo', '/tmp/build/80754af9/xz_1526498705795/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_p', 'binary'),
+('bin/xz', '/tmp/build/80754af9/xz_1526498705795/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_p', 'binary'),
+('lib/liblzma.la', '/opt/anaconda1anaconda2anaconda3', 'text'),
+('lib/pkgconfig/liblzma.pc', '/opt/anaconda1anaconda2anaconda3', 'text')
+]
+
+if __name__ == '__main__':
+    import os
+    import argparse
+    parser = argparse.ArgumentParser(
+            prog='conda-unpack',
+            description=('Finish unpacking the environment after unarchiving.'
+                         'Cleans up absolute prefixes in any remaining files'))
+    parser.add_argument('--version',
+                        action='store_true',
+                        help='Show version then exit')
+    args = parser.parse_args()
+    # Manually handle version printing to output to stdout in python < 3.4
+    if args.version:
+        print('conda-unpack 0.4.0')
+    else:
+        script_dir = os.path.dirname(__file__)
+        new_prefix = os.path.abspath(os.path.dirname(script_dir))
+        for path, placeholder, mode in _prefix_records:
+            update_prefix(os.path.join(new_prefix, path), new_prefix,
+                          placeholder, mode=mode)

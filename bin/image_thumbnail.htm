@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Image Thumbnails</title>
+    <style>
+        *{
+            margin: 0;
+            padding: 0;
+        }
+        .box{
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .box:after{
+            content: '';
+            flex-grow: 99999;
+    	}
+    	.imgBox{
+                flex-grow: 1;
+                margin: 5px;
+    	}
+    	.imgBox img{
+    	    width: auto;
+    	    height: 200px;
+    	    object-fit: cover; 
+    	}
+        figure {
+            width: -webkit-min-content;
+            width: -moz-min-content;
+            width: min-content;
+        }
+        figure.item {
+            vertical-align: top;
+            display: inline-block;
+            text-align: center;
+        }
+    	.caption {
+            display: block;
+        }
+        .zoom {
+          padding: 5px;
+          transition: transform .2s;
+          margin: 0 auto;
+        }
+        .zoom:hover {
+          -ms-transform: scale(1.05); /* IE 9 */
+          -webkit-transform: scale(1.05); /* Safari 3-8 */
+          transform: scale(1.05); 
+        }
+         </style>
+  </head>
+  <body>
+    <div class="box" id="box">
+      <div class="imgBox">
+        <a href="https://i0.wp.com/metro.co.uk/wp-content/uploads/2020/06/Screenshot-2020-06-19-at-15.28.13-a9ef_1592577828.png?w=1200&amp;h=630&amp;crop=1&amp;quality=90&amp;strip=all&amp;zoom=1&amp;ssl=1">
+          <figure class="item">
+            <div class="zoom">
+              <img src="https://i0.wp.com/metro.co.uk/wp-content/uploads/2020/06/Screenshot-2020-06-19-at-15.28.13-a9ef_1592577828.png?w=1200&amp;h=630&amp;crop=1&amp;quality=90&amp;strip=all&amp;zoom=1&amp;ssl=1">
+              <figcaption class="caption">A very very very very very very long description</figcaption>
+            </div>
+          </figure>
+        </a>
+        <a href="https://i1.wp.com/metro.co.uk/wp-content/uploads/2020/06/KloppWerner-7ada_1592574757.png?w=1200&amp;h=630&amp;crop=1&amp;quality=90&amp;strip=all&amp;zoom=1&amp;ssl=1">
+          <figure class="item">
+            <div class="zoom">
+              <img src="https://i1.wp.com/metro.co.uk/wp-content/uploads/2020/06/KloppWerner-7ada_1592574757.png?w=1200&amp;h=630&amp;crop=1&amp;quality=90&amp;strip=all&amp;zoom=1&amp;ssl=1">
+              <figcaption class="caption">A very very very very very very long description</figcaption>
+            </div>
+          </figure>
+        </a>
+        <a href="https://i2.wp.com/metro.co.uk/wp-content/uploads/2020/06/GettyImages-844987648_1592553307.jpg?quality=90&amp;strip=all&amp;w=1200&amp;h=630&amp;crop=1&amp;zoom=1&amp;ssl=1">
+          <figure class="item">
+            <div class="zoom">
+              <img src="https://i2.wp.com/metro.co.uk/wp-content/uploads/2020/06/GettyImages-844987648_1592553307.jpg?quality=90&amp;strip=all&amp;w=1200&amp;h=630&amp;crop=1&amp;zoom=1&amp;ssl=1">
+              <figcaption class="caption">A very very very very very very long description</figcaption>
+            </div>
+          </figure>
+        </a>
+        <a href="https://i2.wp.com/metro.co.uk/wp-content/uploads/2020/06/GettyImages-1093361502_1592572773.jpg?quality=90&amp;strip=all&amp;w=1200&amp;h=630&amp;crop=1&amp;zoom=1&amp;ssl=1">
+          <figure class="item">
+            <div class="zoom">
+              <img src="https://i2.wp.com/metro.co.uk/wp-content/uploads/2020/06/GettyImages-1093361502_1592572773.jpg?quality=90&amp;strip=all&amp;w=1200&amp;h=630&amp;crop=1&amp;zoom=1&amp;ssl=1">
+              <figcaption class="caption">A very very very very very very long description</figcaption>
+            </div>
+          </figure>
+        </a>
+        <a href="https://i1.wp.com/metro.co.uk/wp-content/uploads/2020/06/Patrice-Evra-and-Marcus-Rashford-a12b_1592591482.jpg?quality=90&amp;strip=all&amp;w=1200&amp;h=630&amp;crop=1&amp;zoom=1&amp;ssl=1">
+          <figure class="item">
+            <div class="zoom">
+              <img src="https://i1.wp.com/metro.co.uk/wp-content/uploads/2020/06/Patrice-Evra-and-Marcus-Rashford-a12b_1592591482.jpg?quality=90&amp;strip=all&amp;w=1200&amp;h=630&amp;crop=1&amp;zoom=1&amp;ssl=1">
+              <figcaption class="caption">A very very very very very very long description</figcaption>
+            </div>
+          </figure>
+        </a>
+      </div>
+    </div>
+  </body>
+</html>

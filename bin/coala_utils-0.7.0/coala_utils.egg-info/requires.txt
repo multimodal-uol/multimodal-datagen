@@ -1,0 +1,6 @@
+appdirs==1.4.*
+pyprint==0.2.*
+testfixtures~=5.3.1
+
+[:platform_system == "Windows"]
+pyreadline~=2.1

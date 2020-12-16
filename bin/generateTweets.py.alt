@@ -1,0 +1,146 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+import os
+import time
+
+import splunk.rest
+import splunk.search
+import json,csv
+import codecs
+from itertools import islice
+import subprocess
+import codecs
+import sys
+splunkhome = os.environ['SPLUNK_HOME']
+sys.path.append(os.path.join(splunkhome, 'etc', 'apps', 'searchcommands_app', 'lib'))
+from splunklib.searchcommands import dispatch, StreamingCommand, Configuration, Option, validators
+from splunklib import six
+
+from main import main
+
+sys.path.append('/opt/anaconda3/lib/python3.7/site-packages')
+
+@Configuration()
+class generatetweets(StreamingCommand):
+    user = Option(
+    doc='''
+    **Syntax:** **fieldname=***<fieldname>*
+    **Description:** Name of the field that will hold the match count''',
+    require=True)
+    word = Option(
+    doc='''
+    **Syntax:** **fieldname=***<fieldname>*
+    **Description:** Total number of images''',
+    require=True)
+    bd = Option(
+    doc='''
+    **Syntax:** **fieldname=***<fieldname>*
+    **Description:** Name of the field that will hold the match count''',
+    require=False)
+    ed = Option(
+    doc='''
+    **Syntax:** **fieldname=***<fieldname>*
+    **Description:** Total number of images''',
+    require=False)
+    location = Option(
+    doc='''
+    **Syntax:** **fieldname=***<fieldname>*
+    **Description:** Name of the field that will hold the match count''',
+    require=False)
+    userName = Option(
+    doc='''
+    **Syntax:** **fieldname=***<fieldname>*
+    **Description:** Total number of images''',
+    require=False)
+        
+
+    def stream(self, records):
+        cmd1=""
+        cmd2=""
+        data=""
+        tmpoutputfile = ''
+        outputfile =''
+        searchID =''
+        f = open("/tmp/commands.txt", "w")
+        f.write('here'+self.user+'here1')
+        f.close()
+
+
+
+        if str(self.word) != '' or str(self.user) != '':
+            self.userName = '-'+self.userName
+            outputfile='/opt/twitterdata/tweets/'+searchID
+            timestr = time.strftime("%Y%m%d-%H%M%S")
+            if (self.userName =='-anonymous'):
+                self.userName = ''
+
+
+            if self.user:
+                searchID = self.user+timestr[10:]+self.userName
+                tmpoutputfile = '/tmp/'+searchID+'.json' 
+                main([self.user,'--user','--lang','en','-o',tmpoutputfile])
+                #cmd1 = str( self.user +
+                #          ' ,--user',--lang, en, -o, '+ tmpoutputfile)
+                if (self.location !='all'):
+                    main([self.user,' near:',self.location,' within:50mi','--user','--lang','en',
+                          '-o',tmpoutputfile])
+                    
+                    
+                #main(['realdoanldtrumpang, en, -o, /tmp/guatampal194785137json'])
+
+                outputfile='/opt/twitterdata/tweets/'+searchID
+                
+
+
+            elif self.word:
+                searchID = self.word+timestr[10:]+self.userName
+                tmpoutputfile = '/tmp/'+searchID+'.json'
+                f = open("/tmp/commands.txt", "a")
+                f.write('word')
+                f.close()
+
+                main([self.word,'-bd', self.bd,'-ed',self.ed,'--lang','en','-o',tmpoutputfile])
+                if (self.location !='all'):
+                    main([self.word,' near:',self.location,' within:50mi',' -bd ', self.bd,' -ed ',self.ed,
+                          ' --lang','en','-o',tmpoutputfile])
+
+               
+                outputfile='/opt/twitterdata/tweets/'+searchID
+                #outputfile='/opt/twitterdata/tweets/Coronavirus20200415-121930'
+
+            if  os.path.exists(tmpoutputfile):
+                with codecs.open(tmpoutputfile) as f:
+                    jsonData = json.load(f)   
+
+                for i in range(len(jsonData)):   
+                    jsonData[i]["search_id"] = searchID #Adding seacrh_id
+                    jsonData[i]["current_time"] = timestr 
+
+                os.remove(tmpoutputfile)
+                with codecs.open(outputfile+'.json', 'wb', encoding='utf8') as f:
+                    json.dump(jsonData, f,ensure_ascii=False)
+
+                if len(jsonData) ==0 :
+                    self.output_results([{'Tweet':'No Results Found'}])
+                    return
+
+                i=0
+                for row in jsonData:
+                    if len(jsonData) >=20: 
+                        if i <20:
+                            yield {'_raw': row}
+                            i=i+1
+                    else:
+                        yield {'_raw': row}
+            else:
+                yield {'_raw': 'No Results Found'}
+                return
+        else:
+            yield {'_raw': 'No Results Found'}
+            return;
+
+                                         
+dispatch(generatetweets, sys.argv, sys.stdin, sys.stdout, __name__)
+

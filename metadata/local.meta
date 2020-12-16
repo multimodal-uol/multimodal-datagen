@@ -1,0 +1,15 @@
+[app/ui]
+version = 8.0.2.1
+modtime = 1586097891.661894000
+
+[app/launcher]
+version = 8.0.2.1
+modtime = 1586097891.663528000
+
+[app/package/check_for_updates]
+version = 8.0.2.1
+modtime = 1586097891.664108000
+
+[web/settings]
+version = 8.1.0.1
+modtime = 1607293498.535808000
