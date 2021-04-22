@@ -1,0 +1,56 @@
+from newspaper.newspaper import build
+from newspaper.newspaper import Article
+from datetime import datetime, timedelta
+import json
+import time
+
+outputdir = '/opt/newspaperdata/news/'
+inputfile= 'list-newspaper.txt'
+def newspaper_parser (url):
+    print( 'running newspaper_parser()...')
+
+    results = []
+    count = 0
+    data = {
+        'title': article.title,
+        'date_published': article.publish_date,
+        'news_outlet': article.meta_site_name,
+        'authors': article.authors,
+        'feature_img': article.top_image,
+        'article_link': article.canonical_link,
+        'keywords': article.keywords,
+        'movies': article.movies,
+        'summary': article.summary,
+        'text': article.text,
+        'html': article.html
+    }
+
+    results.append(data)
+    return results
+    
+def write_to_json (file_name, data):
+    with open(file_name, 'w') as f:
+        json.dump(str(data), f)
+
+
+with open('list-newspaper.txt') as f:
+     lines = [line.rstrip() for line in f]
+     print(lines)
+for line in lines:
+    paper = build(line)
+    publisher=''
+    for article in paper.articles:
+        #print(article.url)
+        article = Article(article.url)
+        try:
+            article.build()
+        except:
+            time.sleep(60)
+            continue
+        data = newspaper_parser(article)
+        publisher = str(article.meta_site_name)
+    write_to_json(outputdir+publisher.replace(' ','')\
+                  +str(datetime.today().strftime('%Y-%m-%d')).replace(' ','T')+'.json',data)
+
+
+

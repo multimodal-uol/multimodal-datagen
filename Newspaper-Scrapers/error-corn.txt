@@ -1,0 +1,200 @@
+Starting 2020-12-10 22:00:01
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with HTTPSConnectionPool(host='phw.nhs.wales', port=443): Max retries exceeded with url: /topics/immunisation-and-vaccines/covid-19-vaccination-information/?priority-taxon=774cee22-d896-44c1-a611-e3109cce8eae (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1076)'))) on URL https://phw.nhs.wales/topics/immunisation-and-vaccines/covid-19-vaccination-information/?priority-taxon=774cee22-d896-44c1-a611-e3109cce8eae
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with 403 Client Error: Forbidden for url: https://vimeo.com/489092177 on URL https://vimeo.com/489092177
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with 403 Client Error: Forbidden for url: https://vimeo.com/488847307 on URL https://vimeo.com/488847307
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with 403 Client Error: Forbidden for url: https://vimeo.com/488590381 on URL https://vimeo.com/488590381
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with 403 Client Error: Forbidden for url: https://vimeo.com/485111870 on URL https://vimeo.com/485111870
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with 404 Client Error: Not Found for url: https://www.cdc.gov/coronavirus/2019-ncov/daily-life-coping/going-out.html%20 on URL https://www.cdc.gov/coronavirus/2019-ncov/daily-life-coping/going-out.html 
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with 404 Client Error: Not Found for url: https://www.cdc.gov/coronavirus/2019-ncov/community/health-equity/index.html%20 on URL https://www.cdc.gov/coronavirus/2019-ncov/community/health-equity/index.html 
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with 404 Client Error: Not Found for url: https://www.cdc.gov/mmwr/volumes/69/wr/mm6948e2.htm?s_cid=mm6948e2_x on URL https://www.cdc.gov/mmwr/volumes/69/wr/mm6948e2.htm?s_cid=mm6948e2_x
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with 403 Client Error: FORBIDDEN for url: https://extranet.ecdc.europa.eu/ on URL http://extranet.ecdc.europa.eu
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with 403 Client Error: Forbidden for url: https://vimeo.com/ecdcvideos on URL https://vimeo.com/ecdcvideos
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with HTTPSConnectionPool(host='www.nhs.uk', port=443): Read timed out. (read timeout=7) on URL https://www.nhs.uk/conditions/social-care-and-support-guide/
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with No connection adapters were found for '://' on URL ://
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with No connection adapters were found for '://' on URL ://
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with No connection adapters were found for '://' on URL ://
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with No connection adapters were found for '://' on URL ://
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with No connection adapters were found for '://' on URL ://
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with No connection adapters were found for '://' on URL ://
+
+Traceback (most recent call last):
+  File "webscrapper.py", line 126, in scrape_url
+    article.build()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 162, in build
+    self.parse()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 213, in parse
+    self.throw_if_not_downloaded_verbose()
+  File "/usr/Newspaper-Scrapers/newspaper/article.py", line 560, in throw_if_not_downloaded_verbose
+    (self.download_exception_msg, self.url))
+newspaper.article.ArticleException: Article `download()` failed with No connection adapters were found for '://' on URL ://
+
+Completed 2020-12-10 22:17:01
