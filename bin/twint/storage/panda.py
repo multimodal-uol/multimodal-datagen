@@ -106,7 +106,8 @@ def update(object, config):
             "retweet_date": Tweet.retweet_date,
             "translate": Tweet.translate,
             "trans_src": Tweet.trans_src,
-            "trans_dest": Tweet.trans_dest
+            "trans_dest": Tweet.trans_dest,
+            "video_urls":Tweet.video_urls
             }
         _object_blocks[_type].append(_data)
     elif _type == "user":

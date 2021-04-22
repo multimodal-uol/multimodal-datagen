@@ -3,11 +3,14 @@ from __future__ import unicode_literals
 import re
 
 from .common import InfoExtractor
+from ..compat import compat_parse_qs
 from ..utils import (
     determine_ext,
     ExtractorError,
+    get_element_by_class,
     int_or_none,
     lowercase_escape,
+    try_get,
     update_url_query,
 )
 
@@ -38,21 +41,10 @@ class GoogleDriveIE(InfoExtractor):
         # video can't be watched anonymously due to view count limit reached,
         # but can be downloaded (see https://github.com/ytdl-org/youtube-dl/issues/14046)
         'url': 'https://drive.google.com/file/d/0B-vUyvmDLdWDcEt4WjBqcmI2XzQ/view',
-        'md5': 'bfbd670d03a470bb1e6d4a257adec12e',
-        'info_dict': {
-            'id': '0B-vUyvmDLdWDcEt4WjBqcmI2XzQ',
-            'ext': 'mp4',
-            'title': 'Annabelle Creation (2017)- Z.V1 [TH].MP4',
-        }
+        'only_matching': True,
     }, {
         # video id is longer than 28 characters
         'url': 'https://drive.google.com/file/d/1ENcQ_jeCuj7y19s66_Ou9dRP4GKGsodiDQ/edit',
-        'info_dict': {
-            'id': '1ENcQ_jeCuj7y19s66_Ou9dRP4GKGsodiDQ',
-            'ext': 'mp4',
-            'title': 'Andreea Banica feat Smiley - Hooky Song (Official Video).mp4',
-            'duration': 189,
-        },
         'only_matching': True,
     }, {
         'url': 'https://drive.google.com/open?id=0B2fjwgkl1A_CX083Tkowdmt6d28',
@@ -171,23 +163,21 @@ class GoogleDriveIE(InfoExtractor):
 
     def _real_extract(self, url):
         video_id = self._match_id(url)
-        webpage = self._download_webpage(
-            'http://docs.google.com/file/d/%s' % video_id, video_id)
+        video_info = compat_parse_qs(self._download_webpage(
+            'https://drive.google.com/get_video_info',
+            video_id, query={'docid': video_id}))
 
-        title = self._search_regex(
-            r'"title"\s*,\s*"([^"]+)', webpage, 'title',
-            default=None) or self._og_search_title(webpage)
-        duration = int_or_none(self._search_regex(
-            r'"length_seconds"\s*,\s*"([^"]+)', webpage, 'length seconds',
-            default=None))
+        def get_value(key):
+            return try_get(video_info, lambda x: x[key][0])
+
+        reason = get_value('reason')
+        title = get_value('title')
+        if not title and reason:
+            raise ExtractorError(reason, expected=True)
 
         formats = []
-        fmt_stream_map = self._search_regex(
-            r'"fmt_stream_map"\s*,\s*"([^"]+)', webpage,
-            'fmt stream map', default='').split(',')
-        fmt_list = self._search_regex(
-            r'"fmt_list"\s*,\s*"([^"]+)', webpage,
-            'fmt_list', default='').split(',')
+        fmt_stream_map = (get_value('fmt_stream_map') or '').split(',')
+        fmt_list = (get_value('fmt_list') or '').split(',')
         if fmt_stream_map and fmt_list:
             resolutions = {}
             for fmt in fmt_list:
@@ -248,7 +238,7 @@ class GoogleDriveIE(InfoExtractor):
                 if confirmation_webpage:
                     confirm = self._search_regex(
                         r'confirm=([^&"\']+)', confirmation_webpage,
-                        'confirmation code', fatal=False)
+                        'confirmation code', default=None)
                     if confirm:
                         confirmed_source_url = update_url_query(source_url, {
                             'confirm': confirm,
@@ -256,20 +246,20 @@ class GoogleDriveIE(InfoExtractor):
                         urlh = request_source_file(confirmed_source_url, 'confirmed source')
                         if urlh and urlh.headers.get('Content-Disposition'):
                             add_source_format(urlh)
+                    else:
+                        self.report_warning(
+                            get_element_by_class('uc-error-subcaption', confirmation_webpage)
+                            or get_element_by_class('uc-error-caption', confirmation_webpage)
+                            or 'unable to extract confirmation code')
 
-        if not formats:
-            reason = self._search_regex(
-                r'"reason"\s*,\s*"([^"]+)', webpage, 'reason', default=None)
-            if reason:
-                raise ExtractorError(reason, expected=True)
+        if not formats and reason:
+            raise ExtractorError(reason, expected=True)
 
         self._sort_formats(formats)
 
-        hl = self._search_regex(
-            r'"hl"\s*,\s*"([^"]+)', webpage, 'hl', default=None)
+        hl = get_value('hl')
         subtitles_id = None
-        ttsurl = self._search_regex(
-            r'"ttsurl"\s*,\s*"([^"]+)', webpage, 'ttsurl', default=None)
+        ttsurl = get_value('ttsurl')
         if ttsurl:
             # the video Id for subtitles will be the last value in the ttsurl
             # query string
@@ -279,8 +269,8 @@ class GoogleDriveIE(InfoExtractor):
         return {
             'id': video_id,
             'title': title,
-            'thumbnail': self._og_search_thumbnail(webpage, default=None),
-            'duration': duration,
+            'thumbnail': 'https://drive.google.com/thumbnail?id=' + video_id,
+            'duration': int_or_none(get_value('length_seconds')),
             'formats': formats,
             'subtitles': self.extract_subtitles(video_id, subtitles_id, hl),
             'automatic_captions': self.extract_automatic_captions(

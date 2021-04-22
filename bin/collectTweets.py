@@ -67,14 +67,14 @@ class Echo(SearchCommand):
                 #x= subprocess.check_output(cmd1, shell=True)
                 
                 if self.testing =='True':
-                    outputfile='/usr/testtweets/'+searchID
+                    outputfile='/tmp/'+searchID
                 else:
                     outputfile='/opt/twitterdata/tweets/'+searchID
                            
 
             elif (self.word !=''):
                 searchID = self.word+timestr[10:]+self.userName
-                tmpoutputfile = '/tmp/'+searchID+'.json'
+                tmpoutputfile = '/tmp/'+searchID+time.strftime("%Y%m%d-%H%M%S")+'.json'
                 self.word  = self.word.replace("AND", " ")
                 cmd2 = ('/opt/anaconda3/bin/python3.7' 
                         +' /opt/splunk/etc/apps/multimodal-datagen/bin/twittercrawler.py  '
@@ -87,7 +87,7 @@ class Echo(SearchCommand):
                 os.system(cmd2)
                 
                 if self.testing =='True':
-                    outputfile='/usr/testtweets/'+searchID
+                    outputfile='/tmp/'+searchID+time.strftime("%Y%m%d-%H%M%S")
                 else:
                     outputfile='/opt/twitterdata/tweets/'+searchID
                     

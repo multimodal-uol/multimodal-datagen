@@ -33,6 +33,7 @@ def Tweet(config, t):
         output = output.replace("{translate}", t.translate)
         output = output.replace("{trans_src}", t.trans_src)
         output = output.replace("{trans_dest}", t.trans_dest)
+        output = output.replace("{video_urls}", join(t.video_urls))
     else:
         logme.debug(__name__+':Tweet:notFormat')
         output = f"{t.id_str} {t.datestamp} {t.timestamp} {t.timezone} "

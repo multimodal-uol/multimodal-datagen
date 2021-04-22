@@ -22,6 +22,7 @@ def usersearch(since, until, output, user, near,limit):
     c.Store_json = True
     c.Output = output
     c.Username = user
+    c.Lang='en'
     if near != 'all':
         c.Near = near
     if limit != 'all':

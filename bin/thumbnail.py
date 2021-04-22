@@ -143,6 +143,11 @@ def generate_html(csvfile):
 
 @Configuration()
 class Thumbnails(StreamingCommand):
+    testing = Option(
+        doc='''
+        **Syntax:** ***sourceindex=covid/newspaper
+        **Description:** Detects data source''',
+        require=True)
     sourceindex = Option(
         doc='''
         **Syntax:** ***sourceindex=covid/newspaper
@@ -160,7 +165,27 @@ class Thumbnails(StreamingCommand):
     require=True)
 
     def stream(self, records):
-        if self.sourceindex=='newspaper' :
+        if self.testing=='True' and self.sourceindex=='twitter':
+            image_thumbnail_save_location='/opt/splunk/etc/apps/search/appserver/static/twitter/'
+            image_html_thumbail_save_location='/opt/splunk/etc/apps/search/appserver/static/image_html/twitter/'
+            input_parent_folder='/tmp/'
+            jsonImageDir = '/usr/testmedia/'
+        elif self.testing=='True' and self.sourceindex=='newspaper':
+            image_thumbnail_save_location='/opt/splunk/etc/apps/search/appserver/static/'
+            image_html_thumbail_save_location='/opt/splunk/etc/apps/search/appserver/static/image_html/'
+            input_parent_folder='/tmp/'
+            jsonImageDir = '/usr/testmedia/'
+        elif self.testing=='True' and self.sourceindex=='covid':
+            image_thumbnail_save_location='/opt/splunk/etc/apps/search/appserver/static/covid/'
+            image_html_thumbail_save_location='/opt/splunk/etc/apps/search/appserver/static/image_html/covid/'
+            input_parent_folder='/tmp/'
+            jsonImageDir = '/opt/newspaperdata/imagedata/'
+        elif self.sourceindex=='twitter':
+            image_thumbnail_save_location='/opt/splunk/etc/apps/search/appserver/static/twitter/'
+            image_html_thumbail_save_location='/opt/splunk/etc/apps/search/appserver/static/image_html/twitter/'
+            input_parent_folder='/tmp/'
+            jsonImageDir = '/usr/testmedia/'
+        elif self.sourceindex=='newspaper' :
             image_thumbnail_save_location='/opt/splunk/etc/apps/search/appserver/static/'
             image_html_thumbail_save_location='/opt/splunk/etc/apps/search/appserver/static/image_html/'
             input_parent_folder='/tmp/'

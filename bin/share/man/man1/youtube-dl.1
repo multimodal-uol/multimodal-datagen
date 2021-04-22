@@ -70,7 +70,7 @@ Force extraction to use the generic extractor
 .B \-\-default\-search \f[I]PREFIX\f[]
 Use this prefix for unqualified URLs.
 For example "gvsearch2:" downloads two videos from google videos for
-youtube\-dl "large apple".
+youtube\- dl "large apple".
 Use the value "auto" to let youtube\-dl guess ("auto_warning" to emit a
 warning when guessing).
 "error" just throws an error.
@@ -82,7 +82,7 @@ if this is not possible instead of searching.
 .B \-\-ignore\-config
 Do not read configuration files.
 When given in the global configuration file /etc/youtube\-dl.conf: Do
-not read the user configuration in ~/.config/youtube\- dl/config
+not read the user configuration in ~/.config/youtube\-dl/config
 (%APPDATA%/youtube\-dl/config.txt on Windows)
 .RS
 .RE
@@ -187,9 +187,9 @@ Playlist video to end at (default is last)
 .B \-\-playlist\-items \f[I]ITEM_SPEC\f[]
 Playlist video items to download.
 Specify indices of the videos in the playlist separated by commas like:
-"\-\-playlist\-items 1,2,5,8" if you want to download videos indexed 1,
+"\-\- playlist\-items 1,2,5,8" if you want to download videos indexed 1,
 2, 5, 8 in the playlist.
-You can specify range: "\-\-playlist\-items 1\-3,7,10\-13", it will
+You can specify range: " \-\-playlist\-items 1\-3,7,10\-13", it will
 download the videos at index 1, 2, 3, 7, 10, 11, 12 and 13.
 .RS
 .RE
@@ -380,7 +380,7 @@ while downloading (some players may not be able to play it)
 .TP
 .B \-\-external\-downloader \f[I]COMMAND\f[]
 Use the specified external downloader.
-Currently supports aria2c,avconv,axel,curl,ffmpeg,httpie,wget
+Currently supports aria2c,avconv,axel,c url,ffmpeg,httpie,wget
 .RS
 .RE
 .TP
@@ -405,6 +405,12 @@ Use only video ID in file name
 .TP
 .B \-o, \-\-output \f[I]TEMPLATE\f[]
 Output filename template, see the "OUTPUT TEMPLATE" for all the info
+.RS
+.RE
+.TP
+.B \-\-output\-na\-placeholder \f[I]PLACEHOLDER\f[]
+Placeholder value for unavailable meta fields in output filename
+template (default is "NA")
 .RS
 .RE
 .TP
@@ -462,7 +468,7 @@ Write video annotations to a .annotations.xml file
 .TP
 .B \-\-load\-info\-json \f[I]FILE\f[]
 JSON file containing the video information (created with the
-"\-\-write\-info\-json" option)
+"\-\-write\- info\-json" option)
 .RS
 .RE
 .TP
@@ -686,7 +692,7 @@ lower bound of a range for randomized sleep before each download
 .B \-\-max\-sleep\-interval \f[I]SECONDS\f[]
 Upper bound of a range for randomized sleep before each download
 (maximum possible number of seconds to sleep).
-Must only be used along with \-\-min\-sleep\-interval.
+Must only be used along with \-\-min\- sleep\-interval.
 .RS
 .RE
 .SS Video Format Options:
@@ -753,7 +759,7 @@ Subtitle format, accepts formats preference, for example: "srt" or
 .TP
 .B \-\-sub\-lang \f[I]LANGS\f[]
 Languages of the subtitles to download (optional) separated by commas,
-use \-\-list\- subs for available language tags
+use \-\-list\-subs for available language tags
 .RS
 .RE
 .SS Authentication Options:
@@ -780,7 +786,7 @@ Use .netrc authentication data
 .RE
 .TP
 .B \-\-video\-password \f[I]PASSWORD\f[]
-Video password (vimeo, smotri, youku)
+Video password (vimeo, youku)
 .RS
 .RE
 .SS Adobe Pass Options:
@@ -809,8 +815,8 @@ List all supported multiple\-system operators
 .SS Post\-processing Options:
 .TP
 .B \-x, \-\-extract\-audio
-Convert video files to audio\-only files (requires ffmpeg or avconv and
-ffprobe or avprobe)
+Convert video files to audio\-only files (requires ffmpeg/avconv and
+ffprobe/avprobe)
 .RS
 .RE
 .TP
@@ -838,7 +844,7 @@ Give these arguments to the postprocessor
 .RE
 .TP
 .B \-k, \-\-keep\-video
-Keep the video file on disk after the post\- processing; the video is
+Keep the video file on disk after the post\-processing; the video is
 erased by default
 .RS
 .RE
@@ -869,7 +875,7 @@ Parse additional metadata like song title / artist from the video title.
 The format syntax is the same as \-\-output.
 Regular expression with named capture groups may also be used.
 The parsed parameters replace existing values.
-Example: \-\-metadata\-from\- title "%(artist)s \- %(title)s" matches a
+Example: \-\-metadata\-from\-title "%(artist)s \- %(title)s" matches a
 title like "Coldplay \- Paradise".
 Example (regex): \-\-metadata\-from\-title "(?P.+?) \- (?P
 .RS
@@ -1141,8 +1147,8 @@ actual download
 .IP \[bu] 2
 \f[C]epoch\f[] (numeric): Unix epoch when creating the file
 .IP \[bu] 2
-\f[C]autonumber\f[] (numeric): Five\-digit number that will be increased
-with each download, starting at zero
+\f[C]autonumber\f[] (numeric): Number that will be increased with each
+download, starting at \f[C]\-\-autonumber\-start\f[]
 .IP \[bu] 2
 \f[C]playlist\f[] (string): Name or id of the playlist that contains the
 video
@@ -1219,7 +1225,8 @@ Each aforementioned sequence when referenced in an output template will
 be replaced by the actual value corresponding to the sequence name.
 Note that some of the sequences are not guaranteed to be present since
 they depend on the metadata obtained by a particular extractor.
-Such sequences will be replaced with \f[C]NA\f[].
+Such sequences will be replaced with placeholder value provided with
+\f[C]\-\-output\-na\-placeholder\f[] (\f[C]NA\f[] by default).
 .PP
 For example for \f[C]\-o\ %(title)s\-%(id)s.%(ext)s\f[] and an mp4 video
 with title \f[C]youtube\-dl\ test\ video\f[] and id
@@ -1405,6 +1412,8 @@ download, lower\-case (\f[C]http\f[], \f[C]https\f[], \f[C]rtsp\f[],
 \f[C]http_dash_segments\f[], \f[C]m3u8\f[], or \f[C]m3u8_native\f[])
 .IP \[bu] 2
 \f[C]format_id\f[]: A short description of the format
+.IP \[bu] 2
+\f[C]language\f[]: Language code
 .PP
 Any string comparison may be prefixed with negation \f[C]!\f[] in order
 to produce an opposite comparison, e.g.
@@ -1796,8 +1805,8 @@ Use the \f[C]\-\-cookies\f[] option, for example
 .PP
 In order to extract cookies from browser use any conforming browser
 extension for exporting cookies.
-For example,
-cookies.txt (https://chrome.google.com/webstore/detail/cookiestxt/njabckikapfpffapmjgojcnbfjonfjfg)
+For example, Get
+cookies.txt (https://chrome.google.com/webstore/detail/get-cookiestxt/bgaddhkoddajcdgocldbbfleckgcbcid/)
 (for Chrome) or
 cookies.txt (https://addons.mozilla.org/en-US/firefox/addon/cookies-txt/)
 (for Firefox).

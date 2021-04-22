@@ -1,8 +1,9 @@
 from time import strftime, localtime
 from datetime import datetime, timezone
-
+import traceback
 import logging as logme
 from googletransx import Translator
+import time
 # ref. 
 # - https://github.com/x0rzkov/py-googletrans#basic-usage
 translator = Translator()
@@ -76,8 +77,11 @@ def getText(tw):
 def Tweet(tw, config):
     """Create Tweet object
     """
+    #print(str(tw))
     logme.debug(__name__ + ':Tweet')
     t = tweet()
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    t.AAA = timestr
     t.id = int(tw['id_str'])
     t.id_str = tw["id_str"]
     t.conversation_id = tw["conversation_id_str"]
@@ -98,6 +102,25 @@ def Tweet(tw, config):
     t.timezone = strftime("%z", localtime())
     t.mentions = _get_mentions(tw)
     t.reply_to = _get_reply_to(tw)
+    video_previous = ''
+    temp_video_urls= []
+    try:
+        video_urls = [_video['url'] for _video in tw['extended_entities']['media'][0]['video_info']['variants'] 
+                        if _video['content_type'] == 'video/mp4' 
+                        or _video['content_type'] == 'application/x-mpegURL'
+                        if _video['url'].find("mp4") != -1]
+        for _url in video_urls:
+            video_id_array = _url.split("/")
+            video_id = video_id_array[3] + video_id_array[4]
+            if (_url.find("ext_tw_video") ==-1) or (_url.find("amplify_video") ==-1):
+                temp_video_urls.append(_url)
+            elif video_id != video_previous:
+                temp_video_urls.append(_url)
+                video_previous = video_id
+        t.video_urls = temp_video_urls
+
+    except Exception:
+        t.video_urls = []
     try:
         t.urls = [_url['expanded_url'] for _url in tw['entities']['urls']]
     except KeyError:

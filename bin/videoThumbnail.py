@@ -75,6 +75,11 @@ def generate_html(video_urls):
 
 @Configuration()
 class Thumbnails(StreamingCommand):
+    testing = Option(
+        doc='''
+        **Syntax:** ***sourceindex=covid/newspaper
+        **Description:** Detects data source''',
+        require=True)
     sourceindex = Option(
         doc='''
         **Syntax:** ***sourceindex=covid/newspaper
@@ -92,7 +97,19 @@ class Thumbnails(StreamingCommand):
         require=True)
 
     def stream(self, records):
-        if self.sourceindex=='newspaper' :
+        if self.testing=='True' and self.sourceindex=='newspaper':
+            save_location='/opt/splunk/etc/apps/search/appserver/static/video/'
+            input_parent_folder='/tmp/'
+            jsonVideoDir = '/usr/testmedia/'
+        elif self.testing=='True' and self.sourceindex=='covid':
+            save_location='/opt/splunk/etc/apps/search/appserver/static/video/covid/'
+            input_parent_folder='/tmp/'
+            jsonVideoDir = '/usr/testmedia/'
+        elif self.testing=='True' and self.sourceindex=='twitter':
+            save_location='/opt/splunk/etc/apps/search/appserver/static/video/twitter/'
+            input_parent_folder='/tmp/'
+            jsonVideoDir = '/tmp/'
+        elif self.sourceindex=='newspaper' :
             save_location='/opt/splunk/etc/apps/search/appserver/static/video/'
             input_parent_folder='/tmp/'
             jsonVideoDir = '/opt/newspaperdata/videodata/'
@@ -100,14 +117,19 @@ class Thumbnails(StreamingCommand):
             save_location='/opt/splunk/etc/apps/search/appserver/static/video/covid/'
             input_parent_folder='/tmp/'
             jsonVideoDir = '/opt/coviddata/videodata/'
+        elif self.sourceindex=='twitter' :
+            save_location='/opt/splunk/etc/apps/search/appserver/static/video/twitter/'
+            input_parent_folder='/tmp/'
+            jsonVideoDir = '/opt/twitterdata/videodata/'
         if self.retrieveVideo == 'True':
-            glob_data = []
-            for file in glob.glob('/tmp/' + self.search_id + '/' + '*.json'):
-                with open(file) as json_file:
-                    data = json.load(json_file)
-                    glob_data.append(data)
-            with open(jsonVideoDir + self.search_id + '.json', 'w') as f:
-                json.dump(glob_data, f, indent=4)
+            if self.sourceindex!='twitter':
+                glob_data = []
+                for file in glob.glob('/tmp/' + self.search_id + '/' + '*.json'):
+                    with open(file) as json_file:
+                        data = json.load(json_file)
+                        glob_data.append(data)
+                with open(jsonVideoDir + self.search_id + '.json', 'w') as f:
+                    json.dump(glob_data, f, indent=4)
 
             file_name = self.search_id
             video_urls = readURLs(input_parent_folder + file_name + '.txt')

@@ -24,43 +24,32 @@ import json,csv
 import codecs
 from itertools import islice
 import subprocess
-import sys
+import sys, time
 import subprocess
 
 splunkhome = os.environ['SPLUNK_HOME']
 sys.path.append(os.path.join(splunkhome, 'etc', 'apps', 'searchcommands_app', 'lib'))
-from splunklib.searchcommands import dispatch, StreamingCommand, Configuration, Option, validators
+from splunklib.searchcommands import dispatch,  GeneratingCommand, Configuration, Option, validators
 from splunklib import six
 
-from Gencaption import detectImage
+#from Gencaption import detectImage
+from Demographics import detectImageDemographics
 sys.path.append('/opt/anaconda3/lib/python3.7/site-packages')
 
 
 
 @Configuration()
-class Echo(StreamingCommand):
-    """ Counts the number of non-overlapping matches to a regular expression in a set of fields.
-
-    ##Syntax
-
-    .. code-block::
-        countmatches fieldname=<field> pattern=<regular_expression> <field-list>
-
-    ##Description
-
-    A count of the number of non-overlapping matches to the regular expression specified by `pattern` is computed for
-    each record processed. The result is stored in the field specified by `fieldname`. If `fieldname` exists, its value
-    is replaced. If `fieldname` does not exist, it is created. Event records are otherwise passed through to the next
-    pipeline processor unmodified.
-
-    ##Example
-
-    Count the number of words in the `text` of each tweet in tweets.csv and store the result in `word_count`.
-
-    .. code-block::
-        | inputlookup tweets | countmatches fieldname=word_count pattern="\\w+" text
-
-    """
+class Echo(GeneratingCommand):
+    testing = Option(
+        doc='''
+        **Syntax:** ***sourceindex=covid/newspaper
+        **Description:** testing or production data''',
+        require=True)
+    model = Option(
+        doc='''
+        **Syntax:** ***sourceindex=covid/newspaper
+        **Description:**model type''',
+        require=True)    
     search_id = Option(
         doc='''
         **Syntax:** **fieldname=***<fieldname>*
@@ -71,52 +60,73 @@ class Echo(StreamingCommand):
         **Syntax:** **fieldname=***<fieldname>*
         **Description:** Total number of images''',
         require=True)
+    totalVideos = Option(
+        doc='''
+        **Syntax:** ***totalImages=3
+        **Description:** Restricts image search''',
+        require=True)
     addImageDescription= Option(
         doc='''
         **Syntax:** ***totalImages=3
         **Description:** Restricts image search''',
         require=False)
+    confidenceScore= Option(
+        doc='''
+        **Syntax:** ***confidenceScore=0.3
+        **Description:** Restricts image search''',
+        require=True)
+    addVideoDescription= Option(
+        doc='''
+        **Syntax:** ***totalImages=3
+        **Description:** Restricts image search''',
+        require=False)
+    videoParts= Option(
+        doc='''
+        **Syntax:** ***totalImages=3
+        **Description:** Restricts image search''',
+        require=False)
+    retrieveImage= Option(
+        doc='''
+        **Syntax:** ***totalImages=3
+        **Description:** Restricts image search''',
+        require=False)
+    retrieveVideo= Option(
+        doc='''
+        **Syntax:** ***totalImages=3
+        **Description:** Restricts image search''',
+        require=False)
 
-
-    
-
-    def stream(self, records):
+    def generate(self):
         jsonData = ''
-        outputfile = '/opt/twitterdata/tweets/'
-        f = open("/tmp/commands.txt", "w")
-        f.write(self.totalImages)
-        f.close()
+        inputfile = '/opt/twitterdata/tweets/'
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        imageSearchID = timestr[12:]
+        videoSearchID = timestr[12:]
+        if self.testing =='True' :
+            outputfile = '/usr/testmedia/'
+        else:
+            outputfile = '/opt/twitterdata/imagedata/'
 
-        if self.totalImages == 0:
-            yield{'_raw':'Maximum number of imgaes should be more than 0'}
+        if int(self.totalImages) == 0:
             return 
-        
-        detectImage(outputfile+self.search_id +'.json',self.search_id, self.totalImages, self.addImageDescription)
+        imageSearchID = self.search_id + imageSearchID + self.model
+        if self.retrieveImage =='True':
+            detectImageDemographics(self.testing, self.model, inputfile+self.search_id +'.json', self.search_id, imageSearchID, 
+                                    self.totalImages, self.addImageDescription, self.confidenceScore)
+        else:
+            detectVideos(self.testing, self.model, inputfile+self.search_id +'.json', self.search_id, 
+                                    videoSearchID, self.totalVideos,self.addVideoDescription,self.confidenceScore)
 
-        #imageDescCmd = 'imagedesc '+outputfile+self.search_id +'.json'+' ' + self.search_id 
-        #os.system('/tmp/1.sh&')
-        #subprocess.Popen([sys.executable, '-c', 'sh /tmp/1.sh'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        #subprocess.Popen(["sh","/tmp/1.sh"],close_fds=True)
-        #pid=os.fork()
-        #if pid==0: # new process
-        #os.system(imageDescCmd)
-            #exit()
-        #x= subprocess.check_output(imageDescCmd, shell=True)
-        #print(x)
-        
-
-
-        #f = open("/tmp/commands.txt", "w")
-        #f.write(imageDescCmd)
-        #f.close()
-        if  os.path.exists(outputfile+self.search_id +'-img.json'):
-            with open(outputfile+self.search_id +'-img.json') as f:
-                jsonData = json.load(f)
-                if len(jsonData)==0 :
+        if self.retrieveImage =='True':
+            if  os.path.exists(outputfile+imageSearchID +'.json'):
+                with open(outputfile+imageSearchID +'.json') as f:
+                    jsonData = json.load(f)
+                josnLen = len(jsonData)
+                if josnLen == 0:
                     yield {'_raw': 'Tweets have no images'}
                     return
-            for row in jsonData:
-                yield {'tweet_id': row['tweet_id'], 'image': row['image'],'timestamp': row['timestamp'],'search_id': row['search_id'],'current_time': row['current_time'],'img_urls': row['img_urls']}
+                for row in jsonData:
+                    yield {'image_search_id':imageSearchID, 'image': row['image'],'timestamp': row['timestamp'],'search_id': self.search_id,'current_time': row['current_time'],'img_urls': row['img_urls']}
                     
 
             

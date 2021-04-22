@@ -66,6 +66,7 @@ complete --command youtube-dl --long-option external-downloader-args --descripti
 complete --command youtube-dl --long-option batch-file --short-option a --description 'File containing URLs to download ('"'"'-'"'"' for stdin), one URL per line. Lines starting with '"'"'#'"'"', '"'"';'"'"' or '"'"']'"'"' are considered as comments and ignored.' --require-parameter
 complete --command youtube-dl --long-option id --description 'Use only video ID in file name'
 complete --command youtube-dl --long-option output --short-option o --description 'Output filename template, see the "OUTPUT TEMPLATE" for all the info'
+complete --command youtube-dl --long-option output-na-placeholder --description 'Placeholder value for unavailable meta fields in output filename template (default is "%default")'
 complete --command youtube-dl --long-option autonumber-size
 complete --command youtube-dl --long-option autonumber-start --description 'Specify the start value for %(autonumber)s (default is %default)'
 complete --command youtube-dl --long-option restrict-filenames --description 'Restrict filenames to only ASCII characters, and avoid "&" and spaces in filenames'
@@ -139,12 +140,12 @@ complete --command youtube-dl --long-option username --short-option u --descript
 complete --command youtube-dl --long-option password --short-option p --description 'Account password. If this option is left out, youtube-dl will ask interactively.'
 complete --command youtube-dl --long-option twofactor --short-option 2 --description 'Two-factor authentication code'
 complete --command youtube-dl --long-option netrc --short-option n --description 'Use .netrc authentication data'
-complete --command youtube-dl --long-option video-password --description 'Video password (vimeo, smotri, youku)'
+complete --command youtube-dl --long-option video-password --description 'Video password (vimeo, youku)'
 complete --command youtube-dl --long-option ap-mso --description 'Adobe Pass multiple-system operator (TV provider) identifier, use --ap-list-mso for a list of available MSOs'
 complete --command youtube-dl --long-option ap-username --description 'Multiple-system operator account login'
 complete --command youtube-dl --long-option ap-password --description 'Multiple-system operator account password. If this option is left out, youtube-dl will ask interactively.'
 complete --command youtube-dl --long-option ap-list-mso --description 'List all supported multiple-system operators'
-complete --command youtube-dl --long-option extract-audio --short-option x --description 'Convert video files to audio-only files (requires ffmpeg or avconv and ffprobe or avprobe)'
+complete --command youtube-dl --long-option extract-audio --short-option x --description 'Convert video files to audio-only files (requires ffmpeg/avconv and ffprobe/avprobe)'
 complete --command youtube-dl --long-option audio-format --description 'Specify audio format: "best", "aac", "flac", "mp3", "m4a", "opus", "vorbis", or "wav"; "%default" by default; No effect without -x'
 complete --command youtube-dl --long-option audio-quality --description 'Specify ffmpeg/avconv audio quality, insert a value between 0 (better) and 9 (worse) for VBR or a specific bitrate like 128K (default %default)'
 complete --command youtube-dl --long-option recode-video --description 'Encode the video to another format if necessary (currently supported: mp4|flv|ogg|webm|mkv|avi)' --arguments 'mp4 flv ogg webm mkv' --exclusive
