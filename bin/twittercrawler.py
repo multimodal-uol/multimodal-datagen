@@ -8,6 +8,8 @@ def keywordsearch(since, until, output, term, near,limit):
     c.Store_json = True
     c.Output = output
     c.Search = term
+    #c.Location = True
+    c.Lang='en'
     if near != 'all':
         c.Near = near
     if limit != 'all':
@@ -22,6 +24,7 @@ def usersearch(since, until, output, user, near,limit):
     c.Store_json = True
     c.Output = output
     c.Username = user
+    #c.Location = True
     c.Lang='en'
     if near != 'all':
         c.Near = near

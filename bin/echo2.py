@@ -33,7 +33,7 @@ from splunklib.searchcommands import dispatch,  GeneratingCommand, Configuration
 from splunklib import six
 
 #from Gencaption import detectImage
-from Demographics import detectImageDemographics
+from Demographics import detectImageDemographics, detectVideos
 sys.path.append('/opt/anaconda3/lib/python3.7/site-packages')
 
 
@@ -103,20 +103,20 @@ class Echo(GeneratingCommand):
         imageSearchID = timestr[12:]
         videoSearchID = timestr[12:]
         if self.testing =='True' :
-            outputfile = '/usr/testmedia/'
+            outputfile = '/tmp/'
         else:
             outputfile = '/opt/twitterdata/imagedata/'
 
-        if int(self.totalImages) == 0:
+        if (self.totalImages)  ==0  and int(self.totalVideos) == 0:
             return 
         imageSearchID = self.search_id + imageSearchID + self.model
+        videoSearchID = self.search_id + videoSearchID + self.model
         if self.retrieveImage =='True':
             detectImageDemographics(self.testing, self.model, inputfile+self.search_id +'.json', self.search_id, imageSearchID, 
                                     self.totalImages, self.addImageDescription, self.confidenceScore)
         else:
             detectVideos(self.testing, self.model, inputfile+self.search_id +'.json', self.search_id, 
                                     videoSearchID, self.totalVideos,self.addVideoDescription,self.confidenceScore)
-
         if self.retrieveImage =='True':
             if  os.path.exists(outputfile+imageSearchID +'.json'):
                 with open(outputfile+imageSearchID +'.json') as f:
@@ -127,6 +127,10 @@ class Echo(GeneratingCommand):
                     return
                 for row in jsonData:
                     yield {'image_search_id':imageSearchID, 'image': row['image'],'timestamp': row['timestamp'],'search_id': self.search_id,'current_time': row['current_time'],'img_urls': row['img_urls']}
+        else:
+            yield {'video_search_id':videoSearchID}
+                    
+            
                     
 
             

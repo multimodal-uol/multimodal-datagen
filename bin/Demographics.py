@@ -28,7 +28,7 @@ def detectImageDemographics(testing, modelType, tweetJSON, search_id, image_sear
     confidenceScore = float(confidenceScore)
     model = ''
     if testing =='True' :
-        jsonTweetsDirectory = '/usr/testmedia/'
+        jsonTweetsDirectory = '/tmp/'
     else:
         jsonTweetsDirectory ='/opt/twitterdata/imagedata'
     outputpath = jsonTweetsDirectory+'/'+image_search_id+'.json'
@@ -160,6 +160,7 @@ def detectImageDemographics(testing, modelType, tweetJSON, search_id, image_sear
                 json.dump([ob.__dict__ for ob in listCaption], f,indent=4)
                 
 def detectVideos(testing, modelType, tweetJSON, search_id, video_search_id, totalVideos, addVideoDescription, confidenceScore):
+    k=0
     if totalVideos == 'all':
         totalVideos = 3000
     with open(tweetJSON) as f:

@@ -112,7 +112,7 @@ def Tweet(tw, config):
         for _url in video_urls:
             video_id_array = _url.split("/")
             video_id = video_id_array[3] + video_id_array[4]
-            if (_url.find("ext_tw_video") ==-1) or (_url.find("amplify_video") ==-1):
+            if (video_id.find("mp4") !=-1):
                 temp_video_urls.append(_url)
             elif video_id != video_previous:
                 temp_video_urls.append(_url)

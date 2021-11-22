@@ -75,7 +75,8 @@ class Echo(SearchCommand):
             elif (self.word !=''):
                 searchID = self.word+timestr[10:]+self.userName
                 tmpoutputfile = '/tmp/'+searchID+time.strftime("%Y%m%d-%H%M%S")+'.json'
-                self.word  = self.word.replace("AND", " ")
+                self.word  = self.word.replace("EMPTY", "")
+                self.word  = self.word.replace("SPACE", " ")
                 cmd2 = ('/opt/anaconda3/bin/python3.7' 
                         +' /opt/splunk/etc/apps/multimodal-datagen/bin/twittercrawler.py  '
                         + self.bd +' '+self.ed + ' '+ tmpoutputfile + ' '+'"'+self.word +'"'
